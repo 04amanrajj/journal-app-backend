@@ -7,5 +7,5 @@ jobs:
   keep_alive:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Railway App
+      - name: Ping Render App
         run: curl -s https://journal-app-backend-kxqs.onrender.com/ > /dev/null
