@@ -1,0 +1,11 @@
+name: Keep Render Alive
+on:
+  schedule:
+    - cron: "*/15 * * * *"  # Runs every 15 minutes
+
+jobs:
+  keep_alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render App
+        run: curl -s https://journal-app-backend-kxqs.onrender.com/ > /dev/null
