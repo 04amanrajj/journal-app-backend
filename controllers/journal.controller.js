@@ -1,4 +1,7 @@
 const db = require("../config/db");
+const AdmZip = require('adm-zip');
+const fs = require('fs').promises; // Use promises for async file operations
+const path = require('path');
 
 exports.createJournal = async (req, res) => {
     const { title, content } = req.body;
@@ -21,10 +24,9 @@ exports.createJournal = async (req, res) => {
 
 exports.getJournals = async (req, res) => {
     try {
-        const journals = await db("journals").select("*").where(
-            "user_id",
-            req.user.id
-        );
+        const journals = await db("journals")
+            .select("*")
+            .where("user_id", req.user.id);
         res.status(200).json(journals);
     } catch (err) {
         console.error("Error fetching journals:", err.message);
@@ -70,3 +72,146 @@ exports.deleteJournal = async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 };
+
+exports.uploadJournal = async (req, res) => {
+    let filePath; // Track file path for cleanup
+
+    try {
+        // Validate file presence
+        if (!req.file || !req.file.path) {
+            return res.status(400).json({ error: 'No file uploaded or invalid file' });
+        }
+
+        filePath = path.resolve(req.file.path); // Store resolved path
+        const userId = req.user.id;
+        const importedJournals = [];
+        let fileContent;
+
+        // Handle ZIP file
+        if (req.file.mimetype === 'application/zip' || req.file.originalname.endsWith('.zip')) {
+            try {
+                const zip = new AdmZip(filePath);
+                const zipEntries = zip.getEntries();
+
+                const jsonEntry = zipEntries.find(
+                    (entry) => entry.entryName.endsWith('.json') && !entry.isDirectory
+                );
+
+                if (!jsonEntry) {
+                    return res.status(400).json({ error: 'No JSON file found in the ZIP' });
+                }
+
+                const fileData = jsonEntry.getData().toString('utf8');
+                fileContent = JSON.parse(fileData);
+                console.log('Found JSON file in ZIP:', {
+                    name: jsonEntry.entryName,
+                    size: fileData.length,
+                });
+            } catch (zipError) {
+                console.error('Error processing ZIP file:', zipError.message);
+                return res.status(400).json({ error: 'Invalid or corrupted ZIP file' });
+            }
+        } else {
+            // Handle direct JSON file
+            try {
+                const fileData = await fs.readFile(filePath, 'utf8');
+                fileContent = JSON.parse(fileData);
+            } catch (jsonError) {
+                console.error('Error reading or parsing JSON file:', jsonError.message);
+                return res.status(400).json({ error: 'Invalid JSON file' });
+            }
+        }
+
+        // Validate file content
+        if (!fileContent.entries || !Array.isArray(fileContent.entries)) {
+            return res.status(400).json({
+                error: "Invalid file format. The JSON file must contain an 'entries' array.",
+            });
+        }
+
+        console.log('Processing entries:', {
+            totalEntries: fileContent.entries.length,
+            firstEntryKeys: Object.keys(fileContent.entries[0] || {}),
+        });
+
+        // Reverse entries
+        fileContent.entries.reverse();
+
+        // Process entries
+        for (const entry of fileContent.entries) {
+            try {
+                if (!entry.text || !entry.creationDate || !entry.modifiedDate) {
+                    console.warn('Skipping invalid entry (missing required fields):', entry);
+                    continue;
+                }
+
+                // Extract title from the first line of text
+                const firstLine = entry.text.split('\n')[0];
+                const title = firstLine
+                    .replace(/^#\s*/, '') // Remove leading # and spaces
+                    .replace(/\*\*/g, '') // Remove ** for bold
+                    .replace(/\*/g, '') // Remove single * for italic
+                    .trim();
+
+                // Get the content (everything after the title)
+                const content = entry.text.split('\n').slice(1).join('\n').trim();
+
+                // Create journal entry
+                const [journalId] = await db('journals').insert({
+                    title,
+                    content,
+                    user_id: userId,
+                    created_at: new Date(entry.creationDate),
+                    updated_at: new Date(entry.modifiedDate),
+                });
+
+                importedJournals.push({
+                    id: journalId,
+                    title,
+                    created_at: entry.creationDate,
+                    updated_at: entry.modifiedDate,
+                });
+            } catch (entryError) {
+                console.error('Error processing entry:', entryError.message, entry);
+            }
+        }
+
+        // Send response
+        res.status(200).json({
+            message: 'Journals imported successfully',
+            importedCount: importedJournals.length,
+            importedJournals,
+        });
+    } catch (error) {
+        console.error('Error importing journals:', error.message);
+        if (filePath) {
+            await deleteFileWithRetry(filePath);
+        }
+        return res.status(500).json({ error: 'Error importing journals' });
+    }
+    finally {
+        // Clean up file with retry
+        if (filePath) {
+            await deleteFileWithRetry(filePath);
+        }
+    }
+
+};
+
+// Retry file deletion to handle temporary locks
+async function deleteFileWithRetry(filePath, retries = 3, delay = 100) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            await fs.unlink(filePath);
+            console.log('Successfully deleted file:', filePath);
+            return;
+        } catch (error) {
+            if (i === retries - 1) {
+                console.error('Failed to delete file after retries:', error.message, filePath);
+                return;
+            }
+            console.warn(`Retrying file deletion (${i + 1}/${retries}):`, filePath);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+    }
+}
