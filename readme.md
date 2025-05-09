@@ -1,57 +1,85 @@
 # Journal Backend API Documentation
 
-This project is a backend API for a journal application, built with **Express.js**, **Knex.js** for database queries, and **PostgreSQL** as the database. It uses **bcrypt** for password hashing and **JWT** for token-based authentication. The API supports user authentication, journal entry management, and secure authorization.
+A robust backend API for a journal application, built with Express.js, Knex.js, and PostgreSQL. Features secure authentication, journal management, and RESTful endpoints.
 
 ## Table of Contents
 
-- Technology Stack
-- Endpoints
-  - User Endpoints
-  - Journal Endpoints
-- Database Schema
-- Middlewares
-- Setup Instructions
-- Environment Variables
-- Example Usage
-- Error Handling
+- [Technology Stack](#technology-stack)
+- [Features](#features)
+- [API Endpoints](#api-endpoints)
+- [Database Schema](#database-schema)
+- [Authentication](#authentication)
+- [Middleware](#middleware)
+- [Setup & Installation](#setup--installation)
+- [Environment Variables](#environment-variables)
+- [API Examples](#api-examples)
+- [Error Handling](#error-handling)
+- [Security](#security)
+- [Contributing](#contributing)
 
 ## Technology Stack
 
-- **Node.js & Express.js**: Web framework for building the API.
-- **Knex.js**: SQL query builder for PostgreSQL.
-- **PostgreSQL**: Relational database for persistent storage.
-- **bcrypt**: Password hashing for secure user authentication.
-- **JWT**: JSON Web Tokens for secure, token-based authentication.
+- **Node.js & Express.js**: Web framework for building the API
+- **Knex.js**: SQL query builder for PostgreSQL
+- **PostgreSQL**: Relational database for persistent storage
+- **bcrypt**: Password hashing for secure user authentication
+- **JWT**: JSON Web Tokens for secure, token-based authentication
+- **dotenv**: Environment variable management
 
-## Endpoints
+## Features
+
+- 🔐 Secure user authentication with JWT
+- 📝 CRUD operations for journal entries
+- 🔒 Password hashing with bcrypt
+- 🚫 Token blacklisting for secure logout
+- 📊 PostgreSQL database with Knex.js ORM
+- 🔄 Automatic timestamp management
+- 🛡️ Security middleware implementation
+
+## API Endpoints
 
 ### User Endpoints
 
 **Base URL**: `/user`
 
-| Method | Endpoint | Description | Authentication Required |
-| --- | --- | --- | --- |
-| POST | `/register` | Registers a new user and returns a JWT token. | No |
-| POST | `/login` | Logs in a user and returns a JWT token. | No |
-| POST | `/logout` | Logs out the user by blacklisting the JWT token. | Yes |
-| GET | `/` | Fetches user details and total journal entries. | Yes |
+| Method | Endpoint    | Description       | Auth Required | Request Body                |
+| ------ | ----------- | ----------------- | ------------- | --------------------------- |
+| POST   | `/register` | Register new user | No            | `{ name, email, password }` |
+| POST   | `/login`    | User login        | No            | `{ email, password }`       |
+| POST   | `/logout`   | User logout       | Yes           | `{ token }`                 |
+| GET    | `/`         | Get user profile  | Yes           | -                           |
 
 ### Journal Endpoints
 
 **Base URL**: `/journal`
 
-| Method | Endpoint | Description | Authentication Required |
-| --- | --- | --- | --- |
-| POST | `/create` | Creates a new journal entry. | Yes |
-| GET | `/` | Retrieves all journal entries for the user. | Yes |
-| PUT | `/edit/:id` | Updates a specific journal entry by ID. | Yes |
-| DELETE | `/delete/:id` | Deletes a specific journal entry by ID. | Yes |
+| Method | Endpoint      | Description          | Auth Required | Request Body         |
+| ------ | ------------- | -------------------- | ------------- | -------------------- |
+| POST   | `/create`     | Create journal entry | Yes           | `{ title, content }` |
+| GET    | `/`           | Get all entries      | Yes           | -                    |
+| PUT    | `/edit/:id`   | Update entry         | Yes           | `{ title, content }` |
+| DELETE | `/delete/:id` | Delete entry         | Yes           | -                    |
+
+#### Journal Filters
+
+The GET `/journal` endpoint supports the following query parameters for filtering:
+
+| Parameter | Type   | Description                                   | Example                    |
+| --------- | ------ | --------------------------------------------- | -------------------------- |
+| `id`      | number | Get a specific journal by ID                  | `/journal?id=123`          |
+| `title`   | string | Filter journals by title (case-insensitive)   | `/journal?title=My Day`    |
+| `date`    | string | Filter journals by creation date (YYYY-MM-DD) | `/journal?date=2024-03-20` |
+| `search`  | string | Search in both title and content              | `/journal?search=keyword`  |
+
+Notes:
+
+- The `date` filter uses UTC timezone
+- The `search` parameter performs a case-insensitive search in both title and content
+- All filters are optional
 
 ## Database Schema
 
-### `users` Table
-
-Stores user information.
+### Users Table
 
 ```sql
 CREATE TABLE users (
@@ -64,9 +92,7 @@ CREATE TABLE users (
 );
 ```
 
-### `journals` Table
-
-Stores journal entries.
+### Journals Table
 
 ```sql
 CREATE TABLE journals (
@@ -79,9 +105,7 @@ CREATE TABLE journals (
 );
 ```
 
-### `blacklisted_tokens` Table
-
-Stores blacklisted JWT tokens for logout functionality.
+### Blacklisted Tokens Table
 
 ```sql
 CREATE TABLE blacklisted_tokens (
@@ -91,46 +115,56 @@ CREATE TABLE blacklisted_tokens (
 );
 ```
 
-## Middlewares
+## Authentication
 
-### Authorization Middleware
+The API uses JWT (JSON Web Tokens) for authentication:
 
-- **File**: `auth.middleware.js`
-- **Function**: Verifies the JWT token in the `Authorization` header.
-- **Behavior**:
-  - Decodes the token and attaches the `user_id` to `req.user`.
-  - Rejects requests with invalid or missing tokens.
+1. **Token Generation**: On successful login/register
+2. **Token Validation**: Required for protected routes
+3. **Token Blacklisting**: Implemented for secure logout
+4. **Token Expiration**: Configurable via environment variables
+
+## Middleware
+
+### Authentication Middleware
+
+- Verifies JWT tokens
+- Attaches user data to request object
+- Handles token validation errors
 
 ### Blacklist Middleware
 
-- **File**: `blacklist.middleware.js`
-- **Function**: `checkBlacklist`
-- **Behavior**:
-  - Queries the `blacklisted_tokens` table to check if the token is blacklisted.
-  - Rejects requests if the token is blacklisted or invalid.
+- Checks for blacklisted tokens
+- Prevents use of logged-out tokens
+- Maintains security after logout
 
-## Setup Instructions
+## Setup & Installation
 
-1. **Clone the Repository**:
+1. **Clone Repository**
 
    ```bash
    git clone https://github.com/04amanrajj/journal-app-backend.git
    cd journal-backend
    ```
 
-2. **Install Dependencies**:
+2. **Install Dependencies**
 
    ```bash
    npm install
    ```
 
-3. **Set Up PostgreSQL**:
+3. **Database Setup**
 
-   - Ensure PostgreSQL is installed and running.
-   - Create a database: `createdb journal_app`.
-   - Run the schema SQL (from Database Schema) to create tables.
+   ```bash
+   # Create PostgreSQL database
+   createdb journal_app
 
-4. **Configure Environment Variables**: Create a `.env` file in the project root:
+   # Run migrations (if using Knex)
+   npx knex migrate:latest
+   ```
+
+4. **Environment Setup**
+   Create `.env` file:
 
    ```env
    DATABASE_URL=postgres://<username>:<password>@localhost:5432/journal_app
@@ -139,79 +173,76 @@ CREATE TABLE blacklisted_tokens (
    JWT_EXPIRATION_TIME=1h
    ```
 
-5. **Run the Application**:
-
+5. **Start Server**
    ```bash
    npm start
    ```
 
-6. **Access the API**:
-
-   - Base URL: `http://localhost:3000` (or the configured `PORT`).
-
 ## Environment Variables
 
-| Variable | Description | Example Value |
-| --- | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string | `postgres://user:pass@localhost:5432/db` |
-| `PORT` | Port for the server | `3000` |
-| `JWT_SECRET` | Secret key for JWT signing | `your_jwt_secret_key` |
-| `JWT_EXPIRATION_TIME` | JWT token expiration time | `1h` |
+| Variable              | Description                  | Required | Default |
+| --------------------- | ---------------------------- | -------- | ------- |
+| `DATABASE_URL`        | PostgreSQL connection string | Yes      | -       |
+| `PORT`                | Server port                  | No       | 3000    |
+| `JWT_SECRET`          | JWT signing key              | Yes      | -       |
+| `JWT_EXPIRATION_TIME` | Token expiration             | No       | 1h      |
 
-## Example Usage
+## API Examples
 
-### Register a User
+### User Registration
 
 ```bash
 curl -X POST http://localhost:3000/user/register \
 -H "Content-Type: application/json" \
--d '{"name": "John Doe", "email": "john@example.com", "password": "securepassword"}'
+-d '{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "securepassword"
+}'
 ```
 
-**Response**:
-
-```json
-{
-  "token": "<jwt_token>",
-  "user": { "id": 1, "name": "John Doe", "email": "john@example.com" }
-}
-```
-
-### Create a Journal Entry
+### Create Journal Entry
 
 ```bash
 curl -X POST http://localhost:3000/journal/create \
 -H "Content-Type: application/json" \
 -H "Authorization: Bearer <jwt_token>" \
--d '{"title": "My Day", "content": "It was a great day!"}'
-```
-
-**Response**:
-
-```json
-{
-  "id": 1,
+-d '{
   "title": "My Day",
-  "content": "It was a great day!",
-  "created_at": "2025-05-02T12:00:00Z"
-}
+  "content": "It was a great day!"
+}'
 ```
 
 ## Error Handling
 
-The API returns standard HTTP status codes and error messages:
+The API implements standardized error responses:
 
-- **400 Bad Request**: Invalid input data.
-- **401 Unauthorized**: Missing or invalid JWT token.
-- **403 Forbidden**: Blacklisted token or insufficient permissions.
-- **404 Not Found**: Resource (e.g., journal entry) not found.
-- **500 Internal Server Error**: Server-side errors.
+| Status Code | Description  | Example Response                       |
+| ----------- | ------------ | -------------------------------------- |
+| 400         | Bad Request  | `{ "error": "Invalid input" }`         |
+| 401         | Unauthorized | `{ "error": "Invalid token" }`         |
+| 403         | Forbidden    | `{ "error": "Token blacklisted" }`     |
+| 404         | Not Found    | `{ "error": "Resource not found" }`    |
+| 500         | Server Error | `{ "error": "Internal server error" }` |
 
-**Example Error Response**:
+## Security
 
-```json
-{
-  "error": "Invalid token",
-  "status": 401
-}
-```
+- Password hashing with bcrypt
+- JWT token-based authentication
+- CORS protection
+- Security headers with helmet
+- Token blacklisting
+- Input validation
+- SQL injection prevention with Knex.js
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
