@@ -6,6 +6,7 @@ const {
   registerUser,
   loginUser,
   logoutUser,
+  deleteUser,
 } = require("../controllers/user.controller");
 const { authenticate } = require("../middlewares/authorization.middleware");
 const { checkBlacklist } = require("../middlewares/blacklist.middleware");
@@ -23,5 +24,6 @@ userRoutes.use(authenticate); // Apply authentication middleware
 userRoutes.use(checkBlacklist); // Apply blacklist middleware after authentication
 userRoutes.get("/", userInfo);
 userRoutes.post("/logout", logoutUser);
+userRoutes.delete("/delete", deleteUser);
 
 module.exports = { userRoutes };
