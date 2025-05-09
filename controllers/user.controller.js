@@ -113,3 +113,16 @@ exports.logoutUser = async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 };
+
+exports.deleteUser = async (req, res) => {
+    const user_id = req.user.id;
+
+    try {
+        await db("journals").where("user_id", user_id).del();
+        await db("users").where("id", user_id).del();
+        res.status(200).json({ message: "User deleted successfully" });
+    } catch (err) {
+        logger.error("Error deleting user: " + err.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};
