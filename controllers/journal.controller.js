@@ -2,8 +2,11 @@ const db = require("../config/db");
 const AdmZip = require("adm-zip");
 const fs = require("fs").promises; // Use promises for async file operations
 const path = require("path");
-const s3 = require("../config/minioClient");
-const { PutObjectCommand } = require("@aws-sdk/client-s3");
+const s3 = require("../config/s3Client");
+const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const stream = require("stream");
+
 
 exports.createJournal = async (req, res) => {
     const { title, content } = req.body;
@@ -289,22 +292,40 @@ async function deleteFileWithRetry(filePath, retries = 3, delay = 100) {
 
 exports.uploadJournalS3 = async (req, res) => {
     console.log("Uploading file to S3");
+
     try {
         const { file } = req;
         console.log(file);
 
         const params = {
+            Region: process.env.AWS_REGION,
             Bucket: process.env.S3_BUCKET_NAME,
-            Key: `${Date.now()}-${file.originalname}`,
+            Key: file.originalname,
             Body: file.buffer,
             ContentType: file.mimetype,
         }
+        // Upload file to S3
+        await s3.send(new PutObjectCommand(params));
 
-        const result = await s3.send(new PutObjectCommand(params));
-        const fileUrl = `https://${params.Bucket}.s3.amazonaws.com/${params.Key}`;
-        console.log(result)
+        // Get signed URL for the file
+        const command = new GetObjectCommand({
+            Bucket: process.env.S3_BUCKET_NAME,
+            Key: file.originalname,
+        });
+
+        const fileUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+
+        // Stream the file to the response
+        const data = await s3.send(new GetObjectCommand({
+            Bucket: process.env.S3_BUCKET_NAME,
+            Key: file.originalname,
+        }));
+
+        res.setHeader("Content-Type", file.mimetype);
+        res.setHeader("Content-Disposition", `attachment; filename="${file.originalname}"`);
+        data.Body.pipe(res);
         console.log({ message: "File uploaded successfully", url: fileUrl });
-        res.status(200).json({ message: "File uploaded successfully", url: fileUrl });
+        
 
     } catch (error) {
         console.error("Error uploading media:", error.message);
