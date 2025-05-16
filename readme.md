@@ -22,6 +22,8 @@ A robust backend API for a journal application, built with Express.js, Knex.js, 
 - **Node.js & Express.js**: Web framework for building the API
 - **Knex.js**: SQL query builder for PostgreSQL
 - **PostgreSQL**: Relational database for persistent storage
+- **AWS S3**: Cloud storage for media files (photos, videos, music)
+- **AWS SDK**: AWS JavaScript SDK for S3 integration
 - **bcrypt**: Password hashing for secure user authentication
 - **JWT**: JSON Web Tokens for secure, token-based authentication
 - **dotenv**: Environment variable management
@@ -35,6 +37,7 @@ A robust backend API for a journal application, built with Express.js, Knex.js, 
 - 📊 PostgreSQL database with Knex.js ORM
 - 🔄 Automatic timestamp management
 - 🛡️ Security middleware implementation
+- 📎 File upload support for journal entries
 
 ## API Endpoints
 
@@ -59,6 +62,34 @@ A robust backend API for a journal application, built with Express.js, Knex.js, 
 | GET    | `/`           | Get all entries      | Yes           | -                    |
 | PUT    | `/edit/:id`   | Update entry         | Yes           | `{ title, content }` |
 | DELETE | `/delete/:id` | Delete entry         | Yes           | -                    |
+
+### File Upload Endpoints
+
+**Base URL**: `/journal`
+
+| Method | Endpoint     | Description                                | Auth Required | Request Body          |
+| ------ | ------------ | ------------------------------------------ | ------------- | --------------------- |
+| POST   | `/upload`    | Import journal entries from file           | Yes           | `multipart/form-data` |
+| POST   | `/upload-s3` | Upload media file to S3 storage            | Yes           | `multipart/form-data` |
+
+Notes:
+
+- For `/upload`: Supported file types are JSON files and ZIP files containing JSON
+- For `/upload-s3`: Supported file types are audio, video, and photo files
+- Files uploaded to S3 are stored persistently in AWS S3 bucket
+- For imports, files are temporarily stored locally and deleted after processing
+- The JSON import file should contain an array of entries with the following structure:
+  ```json
+  {
+    "entries": [
+      {
+        "text": "Title\nContent",
+        "creationDate": "2024-03-20T10:00:00Z", 
+        "modifiedDate": "2024-03-20T10:00:00Z"
+      }
+    ]
+  }
+  ```
 
 #### Journal Filters
 
@@ -212,6 +243,48 @@ curl -X POST http://localhost:3000/journal/create \
   "content": "It was a great day!"
 }'
 ```
+
+### Upload Journal File
+
+```bash
+# Local upload
+curl -X POST http://localhost:3000/journal/upload \
+-H "Authorization: Bearer <jwt_token>" \
+-F "file=@/path/to/your/journal.json"
+
+# S3 upload
+curl -X POST http://localhost:3000/journal/upload-s3 \
+-H "Authorization: Bearer <jwt_token>" \
+-F "file=@/path/to/your/image.jpeg"
+```
+
+Response for local upload:
+
+```json
+{
+  "message": "Journals imported successfully",
+  "importedCount": 2,
+  "importedJournals": [
+    {
+      "id": 1,
+      "title": "First Journal",
+      "created_at": "2024-03-20T10:00:00Z",
+      "updated_at": "2024-03-20T10:00:00Z"
+    },
+    {
+      "id": 2,
+      "title": "Second Journal",
+      "created_at": "2024-03-20T11:00:00Z",
+      "updated_at": "2024-03-20T11:00:00Z"
+    }
+  ]
+}
+```
+
+Response for S3 upload:
+
+- Returns the file with appropriate content type and disposition headers
+- File is streamed directly from S3
 
 ## Error Handling
 
