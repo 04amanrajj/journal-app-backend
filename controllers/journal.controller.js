@@ -288,13 +288,14 @@ async function deleteFileWithRetry(filePath, retries = 3, delay = 100) {
 }
 
 exports.uploadJournalS3 = async (req, res) => {
+    console.log("Uploading file to S3");
     try {
         const { file } = req;
         console.log(file);
 
         const params = {
             Bucket: process.env.S3_BUCKET_NAME,
-            key: `${Date.now()}-${file.originalname}`,
+            Key: `${Date.now()}-${file.originalname}`,
             Body: file.buffer,
             ContentType: file.mimetype,
         }
@@ -302,8 +303,8 @@ exports.uploadJournalS3 = async (req, res) => {
         const result = await s3.send(new PutObjectCommand(params));
         const fileUrl = `https://${params.Bucket}.s3.amazonaws.com/${params.Key}`;
         console.log(result)
-        console.log({message: "File uploaded successfully", url: fileUrl});
-        res.status(200).json({message: "File uploaded successfully", url: fileUrl});
+        console.log({ message: "File uploaded successfully", url: fileUrl });
+        res.status(200).json({ message: "File uploaded successfully", url: fileUrl });
 
     } catch (error) {
         console.error("Error uploading media:", error.message);
