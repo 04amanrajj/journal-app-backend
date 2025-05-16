@@ -2,6 +2,8 @@ const db = require("../config/db");
 const AdmZip = require("adm-zip");
 const fs = require("fs").promises; // Use promises for async file operations
 const path = require("path");
+const s3 = require("../config/minioClient");
+const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
 exports.createJournal = async (req, res) => {
     const { title, content } = req.body;
@@ -282,5 +284,29 @@ async function deleteFileWithRetry(filePath, retries = 3, delay = 100) {
             console.warn(`Retrying file deletion (${i + 1}/${retries}):`, filePath);
             await new Promise((resolve) => setTimeout(resolve, delay));
         }
+    }
+}
+
+exports.uploadJournalS3 = async (req, res) => {
+    try {
+        const { file } = req;
+        console.log(file);
+
+        const params = {
+            Bucket: process.env.S3_BUCKET_NAME,
+            key: `${Date.now()}-${file.originalname}`,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+        }
+
+        const result = await s3.send(new PutObjectCommand(params));
+        const fileUrl = `https://${params.Bucket}.s3.amazonaws.com/${params.Key}`;
+        console.log(result)
+        console.log({message: "File uploaded successfully", url: fileUrl});
+        res.status(200).json({message: "File uploaded successfully", url: fileUrl});
+
+    } catch (error) {
+        console.error("Error uploading media:", error.message);
+        res.status(500).json({ error: "Error uploading media" });
     }
 }
