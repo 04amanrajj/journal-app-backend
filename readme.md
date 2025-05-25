@@ -1,6 +1,6 @@
 # Journal Backend API Documentation
 
-A robust backend API for a journal application, built with Express.js, Knex.js, and PostgreSQL. Features secure authentication, journal management, and RESTful endpoints.
+A robust backend API for a [journal application](https://github.com/04amanrajj/journal-native) , built with Express.js, Knex.js, and PostgreSQL. Features secure authentication, journal management, and RESTful endpoints.
 
 ## Table of Contents
 
