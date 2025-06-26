@@ -7,7 +7,8 @@ const {
   editJournal,
   deleteJournal,
   uploadJournal,
-  uploadJournalS3
+  uploadJournalS3,
+  uploadJournalCloudinary
 } = require("../controllers/journal.controller");
 
 const journalRoutes = express.Router();
@@ -30,6 +31,7 @@ journalRoutes.post("/upload", upload.single("file"), uploadJournal)
 // Route to upload a file to S3
 journalRoutes.post("/upload-s3", upload.single("file"), uploadJournalS3)
 
-
+// Route to upload a file to cloudinary
+journalRoutes.post("/upload-cloudinary", upload.single("file"), uploadJournalCloudinary);
 
 module.exports = { journalRoutes };
